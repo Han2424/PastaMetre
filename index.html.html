@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Pâtisserie Yönetimi</title>
+  
+  <meta name="theme-color" content="#1C1B1F">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" id="manifest-link">
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            night: '#1C1B1F',
+            cream: '#F9F3EE',
+            copper: '#C8956C',
+            beigeLight: '#E8D5C4',
+            darkBrown: '#6B4226',
+            surface: '#2A2830',
+            cardBg: '#252330',
+            success: '#7BBF8E',
+            danger: '#E07070'
+          },
+          fontFamily: {
+            serif: ['Georgia', 'serif'],
+            sans: ['system-ui', '-apple-system', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { background-color: #1C1B1F; color: #F9F3EE; margin: 0; overscroll-behavior-y: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    input { outline: none; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script>
+    // Dinamik Manifest Oluşturma
+    const manifest = {
+      name: "Pâtisserie",
+      short_name: "Pâtisserie",
+      start_url: ".",
+      display: "standalone",
+      background_color: "#1C1B1F",
+      theme_color: "#C8956C",
+      icons: [
+        {
+          src: "data:image/svg+xml;base64," + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23C8956C"><path d="M12 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm-4.5 5.5v-2a1.5 1.5 0 0 1 3 0v2h3v-2a1.5 1.5 0 0 1 3 0v2h3A1.5 1.5 0 0 1 21 13v2H3v-2a1.5 1.5 0 0 1 1.5-1.5h3zM3 17v2a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-2H3z"/></svg>`),
+          sizes: "192x192",
+          type: "image/svg+xml",
+          purpose: "any maskable"
+        }
+      ]
+    };
+    document.getElementById('manifest-link').href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(manifest));
+
+    // Basit bir Service Worker ile çevrimdışı çalışma (A2HS gereksinimi)
+    const swCode = `
+      self.addEventListener('install', (e) => self.skipWaiting());
+      self.addEventListener('activate', (e) => self.clients.claim());
+      self.addEventListener('fetch', (e) => {});
+    `;
+    const blob = new Blob([swCode], { type: 'application/javascript' });
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(console.error);
+    }
+  </script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // --- ICONS ---
+    const IconHome = () => <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
+    const IconAdd = () => <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>;
+    const IconHistory = () => <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+    const IconChart = () => <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>;
+    const IconCake = ({ size = 20 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20"/><path d="M7 8v2"/><path d="M12 8v2"/><path d="M17 8v2"/><path d="M7 4h.01"/><path d="M12 4h.01"/><path d="M17 4h.01"/></svg>;
+    const IconTrash = () => <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>;
+    const IconTrendingUp = () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>;
+    const IconTrendingDown = () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>;
+
+    // --- CONSTANTS ---
+    const COST_PER_SLICE = 42.0;
+    const MONTHS = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+    const MONTHS_SHORT = ['', 'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+
+    // --- MAIN APP COMPONENT ---
+    const App = () => {
+      const [tab, setTab] = useState(0);
+      const [orders, setOrders] = useState(() => {
+        const saved = localStorage.getItem('pastry_orders');
+        return saved ? JSON.parse(saved) : [];
+      });
+
+      useEffect(() => {
+        localStorage.setItem('pastry_orders', JSON.stringify(orders));
+      }, [orders]);
+
+      const addOrder = (order) => setOrders(prev => [order, ...prev]);
+      const removeOrder = (id) => setOrders(prev => prev.filter(o => o.id !== id));
+
+      const getActiveMonths = () => {
+        const seen = new Set();
+        const result = [];
+        orders.forEach(o => {
+          const date = new Date(o.date);
+          const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            result.push({ year: date.getFullYear(), month: date.getMonth() + 1 });
+          }
+        });
+        return result.sort((a, b) => {
+          if (a.year !== b.year) return b.year - a.year;
+          return b.month - a.month;
+        });
+      };
+
+      const getMonthlyOrders = (year, month) => orders.filter(o => {
+        const d = new Date(o.date);
+        return d.getFullYear() === year && (d.getMonth() + 1) === month;
+      });
+
+      const calcMonthlyStats = (year, month) => {
+        const mo = getMonthlyOrders(year, month);
+        const revenue = mo.reduce((s, o) => s + o.salePrice, 0);
+        const profit = mo.reduce((s, o) => s + o.netProfit, 0);
+        const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+        return { orders: mo, revenue, profit, margin };
+      };
+
+      return (
+        <div className="h-screen w-full flex flex-col font-sans bg-night text-cream relative overflow-hidden">
+          {/* Main Content Area */}
+          <div className="flex-1 overflow-y-auto no-scrollbar pb-20">
+            {tab === 0 && <Dashboard orders={orders} removeOrder={removeOrder} calcMonthlyStats={calcMonthlyStats} />}
+            {tab === 1 && <AddOrder addOrder={addOrder} switchToHome={() => setTab(0)} />}
+            {tab === 2 && <History orders={orders} removeOrder={removeOrder} getActiveMonths={getActiveMonths} getMonthlyOrders={getMonthlyOrders} />}
+            {tab === 3 && <Analysis orders={orders} getActiveMonths={getActiveMonths} calcMonthlyStats={calcMonthlyStats} />}
+          </div>
+
+          {/* Bottom Navigation */}
+          <div className="absolute bottom-0 w-full bg-surface border-t border-copper/20 pb-safe">
+            <div className="flex justify-around items-center h-16">
+              {[
+                { icon: <IconHome />, label: 'Ana Sayfa' },
+                { icon: <IconAdd />, label: 'Sipariş' },
+                { icon: <IconHistory />, label: 'Geçmiş' },
+                { icon: <IconChart />, label: 'Analiz' }
+              ].map((item, i) => (
+                <button 
+                  key={i} 
+                  onClick={() => setTab(i)} 
+                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${tab === i ? 'text-copper font-bold' : 'text-cream/40 font-normal'}`}
+                >
+                  <div className={`transform transition-transform ${tab === i ? 'scale-110' : 'scale-100'}`}>
+                    {item.icon}
+                  </div>
+                  <span className="text-[10px] tracking-wide">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // --- SCREENS ---
+
+    // 1. DASHBOARD
+    const Dashboard = ({ orders, removeOrder, calcMonthlyStats }) => {
+      const now = new Date();
+      const currStats = calcMonthlyStats(now.getFullYear(), now.getMonth() + 1);
+      
+      const prev = new Date(now.getFullYear(), now.getMonth(), 1);
+      prev.setMonth(prev.getMonth() - 1);
+      const prevStats = calcMonthlyStats(prev.getFullYear(), prev.getMonth() + 1);
+
+      const changePercent = prevStats.profit === 0 
+        ? (currStats.profit > 0 ? 100 : 0)
+        : ((currStats.profit - prevStats.profit) / Math.abs(prevStats.profit)) * 100;
+      const isUp = changePercent >= 0;
+
+      return (
+        <div className="flex flex-col">
+          {/* Header */}
+          <div className="bg-gradient-to-br from-darkBrown to-surface pt-12 pb-8 px-6 rounded-b-[2rem] shadow-lg">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-10 h-10 bg-copper/20 rounded-full flex items-center justify-center text-copper">
+                <IconCake size={22} />
+              </div>
+              <h1 className="font-serif text-copper text-xl font-bold tracking-wider">Pâtisserie</h1>
+            </div>
+            
+            <p className="text-cream/50 text-xs tracking-[0.2em] font-medium mb-1">AYLIK NET KAR</p>
+            <h2 className="text-[2.75rem] font-bold leading-none mb-3">₺{currStats.profit.toFixed(2)}</h2>
+            
+            <div className="flex items-center space-x-2">
+              <span className={`flex items-center text-xs font-medium px-2 py-1 rounded-full ${isUp ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'}`}>
+                {isUp ? <IconTrendingUp /> : <IconTrendingDown />}
+                <span className="ml-1">
+                  {prevStats.profit === 0 && currStats.profit === 0 ? 'Önceki ay verisi yok' : `${isUp ? '+' : ''}${changePercent.toFixed(1)}%`}
+                </span>
+              </span>
+              <span className="text-cream/40 text-xs">{MONTHS[now.getMonth() + 1]} {now.getFullYear()}</span>
+            </div>
+          </div>
+
+          {/* KPI Cards */}
+          <div className="px-5 py-6 flex space-x-3">
+            <StatCard label="Ciro" value={`₺${currStats.revenue.toFixed(0)}`} />
+            <StatCard label="Sipariş" value={currStats.orders.length} />
+            <StatCard label="Ort. Kar" value={`%${currStats.margin.toFixed(1)}`} />
+          </div>
+
+          {/* Order List */}
+          <div className="px-5">
+            <h3 className="text-copper text-xs font-bold tracking-[0.1em] mb-4 uppercase">Bu Ayki Siparişler</h3>
+            {currStats.orders.length === 0 ? (
+              <div className="text-center py-12 text-cream/30 flex flex-col items-center">
+                <IconCake size={48} />
+                <p className="mt-3 text-sm">Henüz sipariş yok</p>
+              </div>
+            ) : (
+              currStats.orders.map(order => <OrderTile key={order.id} order={order} onDelete={() => removeOrder(order.id)} />)
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    const StatCard = ({ label, value }) => (
+      <div className="flex-1 bg-cardBg border border-copper/10 rounded-2xl p-4 flex flex-col">
+        <span className="text-lg font-bold mb-1">{value}</span>
+        <span className="text-cream/40 text-[10px] uppercase tracking-wider font-semibold">{label}</span>
+      </div>
+    );
+
+    const OrderTile = ({ order, onDelete }) => {
+      const isProfit = order.netProfit >= 0;
+      return (
+        <div className="group relative bg-cardBg border border-copper/10 rounded-2xl p-4 mb-3 flex items-center overflow-hidden">
+          <div className="w-10 h-10 bg-copper/10 rounded-xl flex items-center justify-center text-copper mr-4 shrink-0">
+            <IconCake size={20} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-semibold text-sm truncate">{order.name}</h4>
+            <p className="text-cream/40 text-xs mt-0.5">{order.slices} dilim · ₺{order.salePrice.toFixed(0)}</p>
+          </div>
+          <div className="text-right mr-2">
+            <p className={`font-bold text-sm ${isProfit ? 'text-success' : 'text-danger'}`}>₺{order.netProfit.toFixed(0)}</p>
+            <p className={`text-[10px] ${isProfit ? 'text-success/70' : 'text-danger/70'}`}>%{order.profitPercent.toFixed(1)}</p>
+          </div>
+          <button onClick={onDelete} className="p-2 bg-danger/10 text-danger rounded-xl opacity-80 hover:opacity-100 transition-opacity">
+            <IconTrash />
+          </button>
+        </div>
+      );
+    };
+
+    // 2. ADD ORDER
+    const AddOrder = ({ addOrder, switchToHome }) => {
+      const [name, setName] = useState('');
+      const [slices, setSlices] = useState('');
+      const [price, setPrice] = useState('');
+      const [toast, setToast] = useState(false);
+
+      const s = parseInt(slices) || 0;
+      const p = parseFloat(price.replace(',', '.')) || 0;
+      const totalCost = s * COST_PER_SLICE;
+      const netProfit = p - totalCost;
+      const profitPercent = p > 0 ? (netProfit / p) * 100 : 0;
+      const isProfit = netProfit >= 0;
+      const hasInput = s > 0 || p > 0;
+
+      const handleSave = (e) => {
+        e.preventDefault();
+        if (!name.trim() || s <= 0 || p <= 0) return;
+        
+        addOrder({
+          id: Date.now().toString(),
+          name: name.trim(),
+          slices: s,
+          salePrice: p,
+          totalCost,
+          netProfit,
+          profitPercent,
+          date: new Date().toISOString()
+        });
+
+        // Trigger haptic if available
+        if (navigator.vibrate) navigator.vibrate(50);
+        
+        setName(''); setSlices(''); setPrice('');
+        setToast(true);
+        setTimeout(() => { setToast(false); switchToHome(); }, 1200);
+      };
+
+      return (
+        <div className="px-5 pt-12 pb-8 h-full flex flex-col relative">
+          {toast && (
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-success text-night font-bold px-6 py-3 rounded-full shadow-lg z-50 transition-all">
+              Sipariş Eklendi ✓
+            </div>
+          )}
+          
+          <h2 className="text-3xl font-bold mb-1 font-serif">Yeni Sipariş</h2>
+          <p className="text-cream/40 text-sm mb-8">Sipariş detaylarını girin</p>
+
+          <form onSubmit={handleSave} className="flex flex-col space-y-4 flex-1">
+            <div className="space-y-1">
+              <label className="text-xs text-cream/50 ml-1">Sipariş Adı</label>
+              <input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="ör. Çikolatalı Yaş Pasta" className="w-full bg-cardBg border border-copper/20 rounded-xl px-4 py-3 text-sm focus:border-copper transition-colors placeholder:text-cream/20" />
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-xs text-cream/50 ml-1">Dilim Sayısı</label>
+              <input type="number" value={slices} onChange={e => setSlices(e.target.value)} required min="1" placeholder="ör. 12" className="w-full bg-cardBg border border-copper/20 rounded-xl px-4 py-3 text-sm focus:border-copper transition-colors placeholder:text-cream/20" />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-cream/50 ml-1">Satış Fiyatı (₺)</label>
+              <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} required min="1" placeholder="ör. 850" className="w-full bg-cardBg border border-copper/20 rounded-xl px-4 py-3 text-sm focus:border-copper transition-colors placeholder:text-cream/20" />
+            </div>
+
+            {hasInput && (
+              <div className={`mt-6 p-5 rounded-2xl border ${isProfit ? 'border-success/30 bg-success/5' : 'border-danger/30 bg-danger/5'}`}>
+                <h4 className="text-copper text-[10px] tracking-widest font-bold mb-4">HESAP ÖNİZLEMESİ</h4>
+                <div className="flex justify-between text-sm mb-2 text-cream/60">
+                  <span>Maliyet ({s} × ₺{COST_PER_SLICE})</span>
+                  <span className="font-semibold text-cream">₺{totalCost.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm mb-4">
+                  <span className="text-cream/60">Satış Fiyatı</span>
+                  <span className="font-semibold text-cream">₺{p.toFixed(2)}</span>
+                </div>
+                <div className="h-px bg-cream/10 mb-4"></div>
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-cream/80 font-medium">Net Kar</span>
+                  <span className={`text-xl font-bold ${isProfit ? 'text-success' : 'text-danger'}`}>₺{netProfit.toFixed(2)}</span>
+                </div>
+                
+                {/* Progress Bar */}
+                <div className="h-2 w-full bg-danger/20 rounded-full overflow-hidden mb-2">
+                  <div className={`h-full ${isProfit ? 'bg-success' : 'bg-danger'}`} style={{ width: `${Math.min(Math.max((netProfit / p) * 100, 0), 100)}%` }}></div>
+                </div>
+                <p className="text-right text-cream/40 text-[10px]">Kar Marjı: %{profitPercent.toFixed(1)}</p>
+              </div>
+            )}
+
+            <div className="mt-auto pt-6">
+              <button type="submit" className="w-full bg-copper text-night font-bold text-sm py-4 rounded-xl active:scale-[0.98] transition-transform">
+                Siparişi Kaydet
+              </button>
+            </div>
+          </form>
+        </div>
+      );
+    };
+
+    // 3. HISTORY
+    const History = ({ orders, removeOrder, getActiveMonths, getMonthlyOrders }) => {
+      const months = getActiveMonths();
+
+      return (
+        <div className="px-5 pt-12 pb-8 min-h-full">
+          <h2 className="text-3xl font-bold mb-1 font-serif">Geçmiş Aylar</h2>
+          <p className="text-cream/40 text-sm mb-8">Tüm sipariş geçmişi</p>
+
+          {months.length === 0 ? (
+            <div className="text-center py-20 text-cream/30 flex flex-col items-center">
+              <IconHistory size={48} />
+              <p className="mt-4 text-sm">Geçmiş veri bulunamadı</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {months.map(m => (
+                <MonthAccordion key={`${m.year}-${m.month}`} year={m.year} month={m.month} orders={getMonthlyOrders(m.year, m.month)} removeOrder={removeOrder} />
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    const MonthAccordion = ({ year, month, orders, removeOrder }) => {
+      const [isOpen, setIsOpen] = useState(true);
+      const profit = orders.reduce((s, o) => s + o.netProfit, 0);
+
+      return (
+        <div className="bg-cardBg border border-copper/10 rounded-2xl overflow-hidden transition-all">
+          <div className="p-4 flex items-center justify-between cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
+            <div>
+              <h3 className="font-semibold text-sm">{MONTHS[month]} {year}</h3>
+              <p className="text-cream/40 text-xs mt-0.5">{orders.length} sipariş</p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <span className={`font-bold ${profit >= 0 ? 'text-success' : 'text-danger'}`}>₺{profit.toFixed(0)}</span>
+              <span className={`transform transition-transform text-cream/40 ${isOpen ? 'rotate-180' : ''}`}>▼</span>
+            </div>
+          </div>
+          
+          {isOpen && (
+            <div className="border-t border-surface">
+              {orders.map(o => (
+                <div key={o.id} className="p-4 border-b border-surface/50 last:border-0 flex justify-between items-center group">
+                  <div>
+                    <h4 className="text-xs font-medium text-cream/90">{o.name}</h4>
+                    <p className="text-[10px] text-cream/40 mt-1">{o.slices} dilim · ₺{o.salePrice.toFixed(0)}</p>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <div className="text-right">
+                      <p className={`text-xs font-bold ${o.netProfit >= 0 ? 'text-success' : 'text-danger'}`}>₺{o.netProfit.toFixed(0)}</p>
+                      <p className="text-[9px] text-cream/40">%{(o.profitPercent).toFixed(1)}</p>
+                    </div>
+                    <button onClick={() => removeOrder(o.id)} className="text-danger/50 hover:text-danger p-1">
+                      <IconTrash />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // 4. ANALYSIS
+    const Analysis = ({ orders, getActiveMonths, calcMonthlyStats }) => {
+      const months = getActiveMonths().reverse(); // Chronological for chart
+      
+      const totalProfit = orders.reduce((s, o) => s + o.netProfit, 0);
+      const totalRevenue = orders.reduce((s, o) => s + o.salePrice, 0);
+      const avgMargin = orders.length > 0 ? orders.reduce((s, o) => s + o.profitPercent, 0) / orders.length : 0;
+      
+      let bestOrder = null;
+      if (orders.length > 0) {
+        bestOrder = orders.reduce((prev, current) => (prev.netProfit > current.netProfit) ? prev : current);
+      }
+
+      // Chart Data
+      const chartData = months.slice(-6).map(m => {
+        const stats = calcMonthlyStats(m.year, m.month);
+        return { label: MONTHS_SHORT[m.month], profit: stats.profit };
+      });
+      const maxProfit = Math.max(...chartData.map(d => d.profit), 1);
+
+      return (
+        <div className="px-5 pt-12 pb-8">
+          <h2 className="text-3xl font-bold mb-1 font-serif">Analiz</h2>
+          <p className="text-cream/40 text-sm mb-8">Tüm zamanlı performans</p>
+
+          {/* Grid KPIs */}
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <AnalysCard title="Toplam Kar" value={`₺${totalProfit.toFixed(0)}`} color="text-copper" />
+            <AnalysCard title="Toplam Ciro" value={`₺${totalRevenue.toFixed(0)}`} color="text-beigeLight" />
+            <AnalysCard title="Ort. Kar Marjı" value={`%${avgMargin.toFixed(1)}`} color="text-success" />
+            <AnalysCard title="Toplam Sipariş" value={orders.length} color="text-copper/70" />
+          </div>
+
+          {/* Best Order */}
+          {bestOrder && (
+            <div className="mb-6">
+              <h3 className="text-copper text-[10px] tracking-widest font-bold mb-3 uppercase">En İyi Sipariş</h3>
+              <div className="bg-cardBg border border-success/30 rounded-2xl p-4 flex items-center">
+                <div className="w-10 h-10 bg-success/10 rounded-xl flex items-center justify-center text-success mr-4 shrink-0">★</div>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-sm">{bestOrder.name}</h4>
+                  <p className="text-cream/40 text-xs mt-0.5">{bestOrder.slices} dilim · %{bestOrder.profitPercent.toFixed(1)} marj</p>
+                </div>
+                <div className="font-bold text-success text-base">₺{bestOrder.netProfit.toFixed(0)}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Chart */}
+          {chartData.length >= 2 && (
+            <div className="mb-6">
+              <h3 className="text-copper text-[10px] tracking-widest font-bold mb-3 uppercase">Aylık Kar Grafiği (Son 6 Ay)</h3>
+              <div className="bg-cardBg border border-copper/10 rounded-2xl p-4 h-48 flex items-end justify-around space-x-2">
+                {chartData.map((d, i) => {
+                  const heightPercentage = Math.max((d.profit / maxProfit) * 100, 0);
+                  return (
+                    <div key={i} className="flex flex-col items-center w-full h-full justify-end">
+                      <div 
+                        className="w-full max-w-[2rem] bg-copper/80 rounded-t-md transition-all duration-500" 
+                        style={{ height: `${heightPercentage}%`, minHeight: d.profit > 0 ? '4px' : '0' }}
+                      ></div>
+                      <span className="text-[9px] text-cream/40 mt-2">{d.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    const AnalysCard = ({ title, value, color }) => (
+      <div className="bg-cardBg border border-surface rounded-2xl p-4 flex flex-col justify-center">
+        <span className={`text-xl font-bold mb-1 ${color}`}>{value}</span>
+        <span className="text-cream/40 text-[10px] uppercase tracking-wider">{title}</span>
+      </div>
+    );
+
+    // Run React
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
